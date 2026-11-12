@@ -1,0 +1,62 @@
+# Extra services for the Astro project.
+# `astro dev start` merges this file with Astro's own compose file,
+# so MongoDB and Mongo Express run alongside the Airflow containers.
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: currency_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: currency_db
+    ports:
+      - "27017:27017"
+    # (b) Persistent storage: data survives `astro dev stop` / restarts
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    # (a) Docker networking: same network as the Airflow containers,
+    #     so the DAG reaches Mongo by its service name "mongodb"
+    networks:
+      - airflow
+    labels:
+      com.project.name: "currency-exchange-etl"
+      com.project.component: "database"
+      com.project.description: "MongoDB storing transformed daily exchange rates"
+      com.project.maintainer: "Rafay Khan"
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: currency_mongo_express
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin123@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    ports:
+      - "8081:8081"
+    networks:
+      - airflow
+    labels:
+      com.project.name: "currency-exchange-etl"
+      com.project.component: "db-admin-ui"
+      com.project.description: "Mongo Express web UI for MongoDB"
+      com.project.maintainer: "Rafay Khan"
+
+volumes:
+  mongodb_data:
+    labels:
+      com.project.description: "Persistent MongoDB data"
+  mongodb_config:
+    labels:
+      com.project.description: "Persistent MongoDB config"
+
+# "airflow" is the bridge network Astro already creates for its containers
+networks:
+  airflow:
